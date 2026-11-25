@@ -2,3 +2,20 @@ numpy
 scipy
 opencv-python
 matplotlib
+# for Depth Anything 3 (depth.py)
+torch
+torchvision
+einops
+huggingface_hub
+safetensors
+omegaconf
+addict
+imageio
+pillow
+tqdm
+moviepy==1.0.3
+plyfile
+trimesh
+typer
+requests
+evo

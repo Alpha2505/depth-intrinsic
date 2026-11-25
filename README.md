@@ -25,6 +25,8 @@ This repo starts from our Project 2 code.
 
 | File | What's in it |
 |---|---|
+| `depth.py` | Runs Depth Anything 3 on MIT objects and caches depth + camera intrinsics |
+| `geometry.py` | Surface normals from depth, and the angle between neighboring normals ("is the surface smooth here") |
 | `intrinsic.py` | Log derivatives, Retinex and color-cue classifiers, Poisson reconstruction, `decompose()` |
 | `metrics.py` | LMSE error (Grosse et al. 2009) |
 | `io_utils.py` | Loading photos and MIT data, sRGB/linear conversion, saving figures |
@@ -34,10 +36,19 @@ This repo starts from our Project 2 code.
 
 ## Setup
 
+Depth Anything 3 is not on pip, so clone it into `third_party/` (it's gitignored).
+We use Python 3.14 because PyTorch and DA3's dependencies have wheels for it.
+DA3's full package list includes 3D export tools we don't need (xformers, open3d,
+pycolmap), so `requirements.txt` only has what inference needs.
+
 ```bash
-python3 -m venv .venv
+/opt/homebrew/bin/python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+git clone --depth 1 https://github.com/ByteDance-Seed/Depth-Anything-3.git third_party/Depth-Anything-3
 ```
+
+The DA3-BASE weights (`depth-anything/da3-base` on Hugging Face) download automatically the
+first time `depth.py` runs.
 
 Get the MIT Intrinsic Images dataset from
 http://www.cs.toronto.edu/~rgrosse/intrinsic/downloads.html (`intrinsic-data.tar.gz`, about 100 MB)
@@ -49,6 +60,8 @@ each with `diffuse.png`, `shading.png`, `reflectance.png` and `mask.png`).
 ## How to run
 
 ```bash
+.venv/bin/python depth.py        # DA3 depth for the 5 pilot objects -> depth_cache/
+.venv/bin/python geometry.py     # normals + smoothness signal -> results/pilot/geometry.png
 .venv/bin/python synthetic.py
 .venv/bin/python evaluate_mit.py --data mit_data/MIT-intrinsic/data --sweep
 .venv/bin/python run_photos.py photos/
@@ -68,8 +81,8 @@ the objects and test on the other half.
 
 ## To do
 
-- [ ] Run Depth Anything 3 (DA3-BASE) on the MIT images and save the depth maps
-- [ ] Compute surface normals from depth
+- [x] Run Depth Anything 3 (DA3-BASE) on the 5 pilot objects and save the depth maps (`depth.py`)
+- [x] Compute surface normals and a smoothness signal from depth (`geometry.py`)
 - [ ] Add the geometry rule and the no-depth control to `intrinsic.py`
 - [ ] 2-fold threshold split in `evaluate_mit.py`
 - [ ] Pilot on 5 objects, then all 20
