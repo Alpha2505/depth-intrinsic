@@ -12,6 +12,7 @@
 #   retinex - big derivatives are reflectance (Land & McCann)
 #   color   - if the color changes across the edge it's reflectance
 #             (the color cue from Tappen, Freeman & Adelson, NIPS 2002)
+#   combined - color OR retinex (the no-depth control for the final project)
 
 import numpy as np
 from scipy.fft import dctn, idctn
@@ -108,6 +109,11 @@ def decompose(img, method="color", mask=None, retinex_threshold=0.3,
         rx, ry = classify_retinex(gx, gy, retinex_threshold)
     elif method == "color":
         rx, ry = classify_color(img, color_threshold)
+    elif method == "combined":
+        # no-depth control: color change OR strong edge
+        cx, cy = classify_color(img, color_threshold)
+        bx, by = classify_retinex(gx, gy, retinex_threshold)
+        rx, ry = cx | bx, cy | by
     else:
         raise ValueError(f"Unknown method: {method}")
 
