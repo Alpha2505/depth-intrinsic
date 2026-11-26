@@ -25,7 +25,7 @@ import numpy as np
 from intrinsic import decompose
 from io_utils import save_comparison, save_image, to_display
 from metrics import lmse
-from geometry_rules import decompose_with_geometry, decompose_grid_tile
+from geometry_rules import decompose_with_geometry, decompose_grid_tile, surface_normals_from_depth
 
 
 def make_depth(h, w):
@@ -71,6 +71,7 @@ def make_reflectance(h, w, base_color=(0.55, 0.45, 0.30)):
 
 
 def main():
+    """Build the synthetic scene, run every method, and save scores and a figure."""
     h = w = 256
     out = "results/geometry_pilot"
     os.makedirs(out, exist_ok=True)
@@ -97,7 +98,8 @@ def main():
     # geometry's own edge threshold is lower than Retinex's 0.3: a flat,
     # confirmed-geometry region needs much less evidence to call an edge
     # "material," since there's no competing shading explanation there.
-    s, r, e = decompose_with_geometry(image, depth, mask, edge_threshold=0.12)
+    normals = surface_normals_from_depth(depth)  # true depth, so this is a sanity check
+    s, r, e = decompose_with_geometry(image, normals, mask, edge_threshold=0.12)
     results["Color+Geometry"] = (s, r, e)
     scores["Color+Geometry"] = lmse(true_shading, true_refl, s, r, mask)
 

@@ -24,12 +24,14 @@
 #     from "using geometry" from any gain that just comes from making
 #     decisions locally instead of over the whole image.
 #
-# NOTE ON DEPTH: load_depth_map()'s "real" mode calls Depth Anything 3 via
-# the documented Hugging Face `transformers` pipeline API. This has NOT
-# been run or verified in this environment (no GPU/internet here) - verify
-# on your own machine before trusting it. The "synthetic" mode below lets
-# us test the surrounding logic (normals, classifier, reconstruction) right
-# now, without the real model.
+# Nov 25 update: decompose_with_geometry() now takes surface normals instead
+# of a depth map. For MIT objects the normals come from Depth Anything 3
+# (depth.py + geometry.py, which use DA3's real depth and camera intrinsics);
+# the old Depth Anything V2 loader was removed because V2 gives inverse depth,
+# not depth. The synthetic test still uses surface_normals_from_depth() on its
+# known depth. retinex_fallback picks between two rules:
+#   True  - color OR Retinex OR (weaker edge AND flat)   [pilot rule]
+#   False - color OR (strong edge AND flat)              [proposal rule]
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -48,6 +50,7 @@ EPS = 1e-4
 # ---------------------------------------------------------------------
 
 def surface_normals_from_depth(depth, blur_sigma=2.0):
+    """Unit normals from a depth map on the pixel grid (no camera model)."""
     depth_smooth = gaussian_filter(depth.astype(np.float64), blur_sigma)  # filters out texture-induced noise
     dzdy, dzdx = np.gradient(depth_smooth)
     normals = np.dstack([-dzdx, -dzdy, np.ones_like(depth_smooth)])
@@ -71,31 +74,6 @@ def normal_change(normals):
 
 
 # ---------------------------------------------------------------------
-# Depth loading: synthetic (testable now) vs. real (untested here)
-# ---------------------------------------------------------------------
-
-def load_depth_map(img, mode="synthetic", synthetic_depth=None):
-    if mode == "synthetic":
-        if synthetic_depth is not None:
-            return synthetic_depth
-        # flat fallback (no curvature anywhere)
-        return np.ones(img.shape[:2], dtype=np.float64)
-
-    elif mode == "real":
-        from transformers import pipeline
-        from PIL import Image as PILImage
-        depth_pipe = pipeline(task="depth-estimation",
-                            model="depth-anything/Depth-Anything-V2-Small-hf")
-        img_uint8 = np.clip(img * 255, 0, 255).astype(np.uint8)
-        pil_img = PILImage.fromarray(img_uint8)  # the pipeline needs a PIL Image, not a raw array
-        result = depth_pipe(pil_img)
-        return result["predicted_depth"].cpu().numpy()
-
-    else:
-        raise ValueError(f"Unknown mode: {mode}")
-
-
-# ---------------------------------------------------------------------
 # The new geometry-informed classifier
 # ---------------------------------------------------------------------
 
@@ -113,10 +91,11 @@ def classify_geometry(gx, gy, normals, edge_threshold=0.3, normal_threshold=0.05
     return strong_x & flat_x, strong_y & flat_y
 
 
-def decompose_with_geometry(img, depth, mask=None, color_threshold=1.0,
+def decompose_with_geometry(img, normals, mask=None, color_threshold=1.0,
                              edge_threshold=0.3, normal_threshold=0.05,
-                             retinex_threshold=0.3):
-    """Full pipeline: color cue OR (strong-edge-but-flat-geometry) cue.
+                             retinex_threshold=0.3, retinex_fallback=True):
+    """Full pipeline: color cue OR (strong-edge-but-flat-geometry) cue,
+    plus plain Retinex if retinex_fallback is True. normals is H x W x 3.
     Same return signature as intrinsic.decompose() for drop-in use with
     save_comparison()/lmse()."""
     if mask is None:
@@ -126,11 +105,12 @@ def decompose_with_geometry(img, depth, mask=None, color_threshold=1.0,
     gx, gy = gradients(log_i)
 
     cx, cy = classify_color(img, color_threshold)
-    normals = surface_normals_from_depth(depth)
     gex, gey = classify_geometry(gx, gy, normals, edge_threshold, normal_threshold)
+    rx, ry = cx | gex, cy | gey
 
-    bx, by = classify_retinex(gx, gy, retinex_threshold)  # separate, higher threshold — the real safety net
-    rx, ry = cx | bx | gex, cy | by | gey
+    if retinex_fallback:
+        bx, by = classify_retinex(gx, gy, retinex_threshold)  # separate, higher threshold — the real safety net
+        rx, ry = rx | bx, ry | by
 
     mx, my = pair_masks(mask)
     rx &= mx

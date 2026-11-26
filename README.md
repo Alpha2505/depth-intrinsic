@@ -27,6 +27,8 @@ This repo starts from our Project 2 code.
 |---|---|
 | `depth.py` | Runs Depth Anything 3 on MIT objects and caches depth + camera intrinsics |
 | `geometry.py` | Surface normals from depth, and the angle between neighboring normals ("is the surface smooth here") |
+| `geometry_rules.py` | Geometry classifier (two rule versions) and the grid-tile control |
+| `geometry_test.py`, `geometry_mit_test.py` | Synthetic sanity check and the 5-object MIT pilot run |
 | `intrinsic.py` | Log derivatives, Retinex and color-cue classifiers, Poisson reconstruction, `decompose()` |
 | `metrics.py` | LMSE error (Grosse et al. 2009) |
 | `io_utils.py` | Loading photos and MIT data, sRGB/linear conversion, saving figures |
@@ -62,6 +64,8 @@ each with `diffuse.png`, `shading.png`, `reflectance.png` and `mask.png`).
 ```bash
 .venv/bin/python depth.py        # DA3 depth for the 5 pilot objects -> depth_cache/
 .venv/bin/python geometry.py     # normals + smoothness signal -> results/pilot/geometry.png
+.venv/bin/python geometry_test.py      # synthetic sanity check of the geometry rule
+.venv/bin/python geometry_mit_test.py  # all methods on the 5 pilot objects -> results/geometry_mit/
 .venv/bin/python synthetic.py
 .venv/bin/python evaluate_mit.py --data mit_data/MIT-intrinsic/data --sweep
 .venv/bin/python run_photos.py photos/
@@ -83,6 +87,7 @@ the objects and test on the other half.
 
 - [x] Run Depth Anything 3 (DA3-BASE) on the 5 pilot objects and save the depth maps (`depth.py`)
 - [x] Compute surface normals and a smoothness signal from depth (`geometry.py`)
-- [ ] Add the geometry rule and the no-depth control to `intrinsic.py`
+- [x] Add the geometry rules (pilot rule and proposal rule) and the no-depth control (`geometry_rules.py`, `combined` in `intrinsic.py`)
+- [ ] Fix the grid-tile control (per-tile threshold instead of the global 0.3)
 - [ ] 2-fold threshold split in `evaluate_mit.py`
 - [ ] Pilot on 5 objects, then all 20
